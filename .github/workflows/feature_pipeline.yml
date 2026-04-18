@@ -27,4 +27,4 @@ jobs:
         env: 
           HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
         run: |
-          python -u src.feature_pipeline.backfill
+          python -u -m src.feature_pipeline.backfill
