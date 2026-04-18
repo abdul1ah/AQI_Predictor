@@ -2,12 +2,25 @@ import requests
 import pandas as pd
 from datetime import datetime, timedelta
 import time
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from src.config import GLOBAL_CITIES, HISTORICAL_YEARS
+
+# 1. Set up a resilient session that automatically retries failed/timed-out requests
+session = requests.Session()
+retries = Retry(
+    total=5,  # Try 5 times before giving up
+    backoff_factor=1,  # Wait 1s, 2s, 4s, 8s between retries to give the API a break
+    status_forcelist=[429, 500, 502, 503, 504], # Retry on rate limits and server errors
+)
+session.mount('https://', HTTPAdapter(max_retries=retries))
 
 def get_coordinates(city_name: str):
     """Resolves latitude and longitude for a given city name."""
     url = f"https://geocoding-api.open-meteo.com/v1/search?name={city_name}&count=1&format=json"
-    response = requests.get(url, timeout=10)
+    
+    # 2. Use the session with a strict 10-second timeout
+    response = session.get(url, timeout=10)
     response.raise_for_status()
     data = response.json()
     
@@ -32,7 +45,8 @@ def fetch_historical_data(city_name: str, years_back: int) -> pd.DataFrame:
         f"&hourly=pm10,pm2_5,nitrogen_dioxide,ozone"
     )
     
-    response = requests.get(url)
+    # 3. Use the session with a 15-second timeout for the massive data pull
+    response = session.get(url, timeout=15)
     response.raise_for_status()
     data = response.json().get("hourly", {})
     
@@ -54,14 +68,9 @@ def build_master_dataset() -> pd.DataFrame:
         try:
             df = fetch_historical_data(city, HISTORICAL_YEARS)
             data_frames.append(df)
-            time.sleep(3)
+            print(f"  -> Success for {city.capitalize()}! Resting for 3 seconds...")
+            time.sleep(3) # Respect API limits between cities
         except Exception as e:
-            print(f"Error processing {city}: {e}")
+            print(f"  -> Error processing {city.capitalize()}: {e}")
             
     return pd.concat(data_frames, ignore_index=True)
-
-if __name__ == "__main__":
-    
-    print("data fetcher module testing")
-    test_df = build_master_dataset()
-    print(f"Success! Fetched {len(test_df)} rows.")
