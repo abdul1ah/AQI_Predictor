@@ -18,6 +18,7 @@ def upload_to_feature_store(features_df: pd.DataFrame):
             project = hopsworks.login(
                 project=HOPSWORKS_PROJECT_NAME, 
                 api_key_value=HOPSWORKS_API_KEY
+                hostname_verification=False
             )
             fs = project.get_feature_store()
             
