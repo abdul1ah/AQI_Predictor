@@ -54,7 +54,7 @@ def build_master_dataset() -> pd.DataFrame:
         try:
             df = fetch_historical_data(city, HISTORICAL_YEARS)
             data_frames.append(df)
-            time.sleep(1)
+            time.sleep(3)
         except Exception as e:
             print(f"Error processing {city}: {e}")
             
