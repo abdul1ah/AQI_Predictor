@@ -4,3 +4,4 @@ hopsworks==4.7.2
 scikit-learn==1.4.0
 python-dotenv==1.0.1
 pyarrow==15.0.0
+confluent-kafka
