@@ -1,10 +1,9 @@
 name: Feature Pipeline Execution
 
 on:
-  workflow_dispatch: # This allows you to trigger the script manually from the GitHub website
+  workflow_dispatch: 
   schedule:
-    - cron: '0 0 * * *' # This schedules the script to run automatically every day at midnight
-
+    - cron: '0 * * * *'
 jobs:
   run-pipeline:
     runs-on: ubuntu-latest
@@ -26,7 +25,6 @@ jobs:
 
       - name: Execute Feature Pipeline
         env: 
-          # This securely pulls your API key from GitHub Secrets
           HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
         run: |
           python -m src.feature_pipeline.backfill

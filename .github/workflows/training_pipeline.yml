@@ -2,6 +2,8 @@ name: Model Training Pipeline
 
 on:
   workflow_dispatch: # Allows manual trigger
+  schedule:
+    - cron: '0 0 * * *' # schedules the script to run automatically every day at midnight
 
 jobs:
   train-and-register:
