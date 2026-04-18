@@ -14,12 +14,13 @@ def upload_to_feature_store(features_df: pd.DataFrame):
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            
             project = hopsworks.login(
+                host="eu-west.cloud.hopsworks.ai", 
                 project=HOPSWORKS_PROJECT_NAME, 
                 api_key_value=HOPSWORKS_API_KEY,
                 hostname_verification=False
             )
+            
             fs = project.get_feature_store()
             
             print(f"Configuring Feature Group: {FEATURE_GROUP_NAME}...")
