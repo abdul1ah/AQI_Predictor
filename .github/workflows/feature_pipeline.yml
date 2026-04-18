@@ -1,0 +1,32 @@
+name: Feature Pipeline Execution
+
+on:
+  workflow_dispatch: # This allows you to trigger the script manually from the GitHub website
+  schedule:
+    - cron: '0 0 * * *' # This schedules the script to run automatically every day at midnight
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Execute Feature Pipeline
+        env: 
+          # This securely pulls your API key from GitHub Secrets
+          HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
+        run: |
+          python -m src.feature_pipeline.backfill
