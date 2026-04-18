@@ -19,6 +19,7 @@ GLOBAL_CITIES = [
     "mumbai",      
     "sydney",
     "delhi",
-    "lahore"      
+    "lahore",
+    "karachi"  
 ]
 HISTORICAL_YEARS = 3
