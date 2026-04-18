@@ -7,7 +7,7 @@ from src.config import GLOBAL_CITIES, HISTORICAL_YEARS
 def get_coordinates(city_name: str):
     """Resolves latitude and longitude for a given city name."""
     url = f"https://geocoding-api.open-meteo.com/v1/search?name={city_name}&count=1&format=json"
-    response = requests.get(url)
+    response = requests.get(url, timeout=10)
     response.raise_for_status()
     data = response.json()
     

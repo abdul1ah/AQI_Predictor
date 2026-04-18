@@ -3,13 +3,17 @@ import pandas as pd
 from src.config import (
     HOPSWORKS_PROJECT_NAME, 
     FEATURE_GROUP_NAME, 
-    FEATURE_GROUP_VERSION
+    FEATURE_GROUP_VERSION,
+    HOPSWORKS_API_KEY
 )
 
 def upload_to_feature_store(features_df: pd.DataFrame):
-    """Uploads the engineered feature matrix to Hopsworks."""
     print("Authenticating with Hopsworks...")
-    project = hopsworks.login(project=HOPSWORKS_PROJECT_NAME)
+
+    project = hopsworks.login(
+        project=HOPSWORKS_PROJECT_NAME, 
+        api_key_value=HOPSWORKS_API_KEY
+    )
     fs = project.get_feature_store()
     
     print(f"Configuring Feature Group: {FEATURE_GROUP_NAME}...")
