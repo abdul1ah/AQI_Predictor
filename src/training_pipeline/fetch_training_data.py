@@ -12,17 +12,14 @@ def get_training_dataset() -> pd.DataFrame:
     )
     fs = project.get_feature_store()
     
-    # 1. Grab your Feature Group directly
     fg = fs.get_feature_group(
         name=FEATURE_GROUP_NAME, 
         version=FEATURE_GROUP_VERSION
     )
     
-    # 2. Read the raw, unsplit dataframe (Bypassing Feature View stripping)
     print(f"Downloading raw dataset from {FEATURE_GROUP_NAME} V{FEATURE_GROUP_VERSION}...")
     df = fg.read()
     
-    # Sort by date to prevent temporal data leakage (Great catch from your old code!)
     df = df.sort_values(by=['city', 'date']).reset_index(drop=True)
     
     print(f"Successfully downloaded {len(df)} rows.")

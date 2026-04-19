@@ -1,49 +1,52 @@
 import os
 import joblib
 import hopsworks
-from src.config import HOPSWORKS_PROJECT_NAME, HOPSWORKS_API_KEY
 from src.training_pipeline.fetch_training_data import get_training_dataset
 from src.training_pipeline.train_evaluate import train_model
+from src.config import HOPSWORKS_PROJECT_NAME, HOPSWORKS_API_KEY
 
-def upload_model(model, metrics: dict):
-    """Packages the model and registers it to the Hopsworks cloud."""
-    print("Exporting model artifact...")
-    model_dir = "aqi_model_dir"
+def upload_models(trained_models_dict, metrics_dict):
+    """Uploads the three champion multi-step models to Hopsworks."""
+    print("Exporting model artifacts...")
+    
+    
+    model_dir = "aqi_multi_step_models"
     os.makedirs(model_dir, exist_ok=True)
-    joblib.dump(model, f"{model_dir}/random_forest_aqi.pkl")
+    
+    for target, model in trained_models_dict.items():
+        joblib.dump(model, os.path.join(model_dir, f"{target}_model.pkl"))
 
     print("Connecting to Hopsworks Model Registry...")
-    
-    # Explicitly disabling hostname verification
     project = hopsworks.login(
         host="eu-west.cloud.hopsworks.ai", 
         project=HOPSWORKS_PROJECT_NAME, 
         api_key_value=HOPSWORKS_API_KEY,
         hostname_verification=False
     )
-    
     mr = project.get_model_registry()
 
-    print("Registering model artifact...")
-    aqi_model = mr.python.create_model(
-        name="aqi_forecasting_model",
-        metrics=metrics,
-        description="Random Forest regressor predicting next-day PM2.5 levels."
-    )
 
-    aqi_model.save(model_dir)
-    print("Model successfully registered in the cloud.")
+    for target, metrics in metrics_dict.items():
+        model_name = f"aqi_{target}_model"
+        print(f"Registering {model_name}...")
+        
+        aqi_model = mr.python.create_model(
+            name=model_name, 
+            metrics=metrics,
+            description=f"Champion model for {target} forecasting"
+        )
+        
+        
+        aqi_model.save(os.path.join(model_dir, f"{target}_model.pkl"))
 
 if __name__ == "__main__":
     print("=== Starting Model Training Pipeline ===")
     
-    # 1. Fetch Data
+    
     data = get_training_dataset()
     
-    # 2. Train and Evaluate
-    trained_model, eval_metrics = train_model(data)
+    trained_models, eval_metrics = train_model(data)
     
-    # 3. Register to Cloud
-    upload_model(trained_model, eval_metrics)
+    upload_models(trained_models, eval_metrics)
     
-    print("=== Pipeline Execution Finished ===")
+    print("=== Pipeline Complete ===")
