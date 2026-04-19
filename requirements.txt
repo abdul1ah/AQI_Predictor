@@ -8,3 +8,4 @@ confluent-kafka
 xgboost
 lightgbm
 shap
+matplotlib
