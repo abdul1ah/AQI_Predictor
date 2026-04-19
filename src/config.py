@@ -9,7 +9,7 @@ HOPSWORKS_API_KEY = os.getenv("HOPSWORKS_API_KEY")
 FEATURE_GROUP_NAME = "global_aqi_features"
 FEATURE_GROUP_VERSION = 2
 FEATURE_VIEW_NAME = "global_aqi_view"
-FEATURE_VIEW_VERSION = 1
+FEATURE_VIEW_VERSION = 2
 
 # cities to include in the AQI prediction model
 GLOBAL_CITIES = [
