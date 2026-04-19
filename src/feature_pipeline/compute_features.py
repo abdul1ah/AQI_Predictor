@@ -37,8 +37,10 @@ def build_feature_pipeline(raw_df: pd.DataFrame) -> pd.DataFrame:
     daily_df['target_pm2_5_2d'] = daily_df.groupby('city')['pm2_5'].shift(-2)
     daily_df['target_pm2_5_3d'] = daily_df.groupby('city')['pm2_5'].shift(-3)
     
-    # Drop rows with NaN targets (the very last few days of the dataset won't have future targets yet)
+
     final_df = daily_df.dropna().reset_index(drop=True)
+    
+    final_df = final_df.drop(columns=['timestamp'], errors='ignore')
     
     print(f"Feature engineering complete. Matrix shape: {final_df.shape}")
     return final_df
