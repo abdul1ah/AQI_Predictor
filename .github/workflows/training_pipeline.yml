@@ -29,3 +29,9 @@ jobs:
           HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
         run: |
           python -m src.training_pipeline.register_model
+
+      - name: Upload SHAP Feature Importance Plots
+        uses: actions/upload-artifact@v4
+        with:
+          name: shap-feature-plots
+          path: '*.png'

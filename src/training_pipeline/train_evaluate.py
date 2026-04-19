@@ -9,121 +9,103 @@ import xgboost as xgb
 import lightgbm as lgb
 import shap
 
-def train_model(train_data: pd.DataFrame) -> Tuple[Any, Dict[str, float]]:
+def train_model(train_data: pd.DataFrame) -> Tuple[Dict[str, Any], Dict[str, Dict[str, float]]]:
     """
-    Executes a comprehensive training pipeline including Time Series Cross-Validation,
-    hyperparameter tuning across advanced models, and SHAP feature evaluation.
+    Executes a multi-step training pipeline, building separate champion models 
+    for 1-day, 2-day, and 3-day AQI forecasts.
     """
-    print("Preparing data for training...")
+    print("Preparing data for multi-step training...")
     
-    # Isolate features (X) and the primary 1-day target (y)
-    X = train_data.drop(columns=['city', 'date', 'target_pm2_5_1d', 'target_pm2_5_2d', 'target_pm2_5_3d'])
-    y = train_data['target_pm2_5_1d']
+    targets = ['target_pm2_5_1d', 'target_pm2_5_2d', 'target_pm2_5_3d']
+    
+    base_X = train_data.drop(columns=['city', 'date'] + targets)
+    
 
-    # Sequential split (80% train, 20% test) to respect time
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
-
-    # Define the Time Series cross-validation strategy
-    tscv = TimeSeriesSplit(n_splits=3)
-
-    # Expanded Model Zoo including XGBoost and LightGBM
     model_zoo = {
         "Ridge_Regression": {
-            "model": Ridge(),
+            "model": Ridge(), 
             "params": {"alpha": [0.1, 1.0, 10.0]}
         },
         "Random_Forest": {
             "model": RandomForestRegressor(random_state=42, n_jobs=-1),
-            "params": {
-                "n_estimators": [50, 100],
-                "max_depth": [None, 10]
-            }
+            "params": {"n_estimators": [50, 100], "max_depth": [None, 10]}
         },
         "Gradient_Boosting": {
             "model": GradientBoostingRegressor(random_state=42),
-            "params": {
-                "n_estimators": [50, 100],
-                "learning_rate": [0.05, 0.1],
-                "max_depth": [3, 5]
-            }
+            "params": {"n_estimators": [50, 100], "learning_rate": [0.05, 0.1], "max_depth": [3, 5]}
         },
         "XGBoost": {
             "model": xgb.XGBRegressor(objective='reg:squarederror', random_state=42, n_jobs=-1),
-            "params": {
-                "n_estimators": [50, 100],
-                "learning_rate": [0.05, 0.1],
-                "max_depth": [3, 5]
-            }
+            "params": {"n_estimators": [50, 100], "learning_rate": [0.05, 0.1], "max_depth": [3, 5]}
         },
         "LightGBM": {
             "model": lgb.LGBMRegressor(random_state=42, n_jobs=-1, verbose=-1),
-            "params": {
-                "n_estimators": [50, 100],
-                "learning_rate": [0.05, 0.1],
-                "num_leaves": [31, 50]
-            }
+            "params": {"n_estimators": [50, 100], "learning_rate": [0.05, 0.1], "num_leaves": [31, 50]}
         }
     }
 
-    best_overall_model = None
-    best_overall_score = float('-inf')
-    best_model_name = ""
+    champion_models = {}
+    all_metrics = {}
 
-    print("\nInitiating GridSearchCV across expanded model zoo...")
     
-    for model_name, config in model_zoo.items():
-        print(f"Running grid search for {model_name}...")
+    for target in targets:
+        print(f"\n{'='*50}")
+        print(f"TRAINING PIPELINE FOR: {target.upper()}")
+        print(f"{'='*50}")
         
-        grid_search = GridSearchCV(
-            estimator=config["model"],
-            param_grid=config["params"],
-            cv=tscv,
-            scoring='r2',
-            n_jobs=-1
-        )
+        y = train_data[target]
         
-        grid_search.fit(X_train, y_train)
         
-        print(f"  Best params: {grid_search.best_params_}")
-        print(f"  Validation R2: {grid_search.best_score_:.4f}")
+        X_train, X_test, y_train, y_test = train_test_split(base_X, y, test_size=0.2, shuffle=False)
+        tscv = TimeSeriesSplit(n_splits=3)
+
+        best_target_score = float('-inf')
+        best_target_model = None
+        best_target_name = ""
+
         
-        if grid_search.best_score_ > best_overall_score:
-            best_overall_score = grid_search.best_score_
-            best_overall_model = grid_search.best_estimator_
-            best_model_name = model_name
-
-    print("\n--- Hyperparameter Tuning Complete ---")
-    print(f"Selected Champion Model: {best_model_name}")
-
-    print("\nEvaluating champion model on holdout test set...")
-    predictions = best_overall_model.predict(X_test)
-    metrics = {
-        "RMSE": mean_squared_error(y_test, predictions, squared=False),
-        "MAE": mean_absolute_error(y_test, predictions),
-        "R2": r2_score(y_test, predictions)
-    }
-
-    print("\n--- Final Model Evaluation Metrics ---")
-    for metric, value in metrics.items():
-        print(f"{metric}: {value:.4f}")
-    print("--------------------------------------\n")
-
-    # --- SHAP FEATURE IMPORTANCE ---
-    print("Generating SHAP Feature Explanations...")
-    try:
-        # SHAP TreeExplainer is highly optimized for RF, GB, XGBoost, and LightGBM
-        if best_model_name in ["Random_Forest", "Gradient_Boosting", "XGBoost", "LightGBM"]:
-            explainer = shap.TreeExplainer(best_overall_model)
-            shap_values = explainer.shap_values(X_test)
+        for model_name, config in model_zoo.items():
+            print(f"-> Cross-validating {model_name}...")
+            grid_search = GridSearchCV(
+                estimator=config["model"], param_grid=config["params"],
+                cv=tscv, scoring='r2', n_jobs=-1
+            )
+            grid_search.fit(X_train, y_train)
             
-            # Save the plot so we can view it later
-            plt.figure(figsize=(10, 6))
-            shap.summary_plot(shap_values, X_test, show=False)
-            plt.savefig("shap_feature_importance.png", bbox_inches='tight')
-            print("SHAP summary plot successfully saved as 'shap_feature_importance.png'.")
-        else:
-            print("Champion model is linear; skipping SHAP TreeExplainer.")
-    except Exception as e:
-        print(f"SHAP generation bypassed: {e}")
+            if grid_search.best_score_ > best_target_score:
+                best_target_score = grid_search.best_score_
+                best_target_model = grid_search.best_estimator_
+                best_target_name = model_name
 
-    return best_overall_model, metrics
+        print(f"\n[WINNER FOR {target}]: {best_target_name}")
+
+        # Evaluate the specific champion
+        predictions = best_target_model.predict(X_test)
+        metrics = {
+            "RMSE": mean_squared_error(y_test, predictions, squared=False),
+            "MAE": mean_absolute_error(y_test, predictions),
+            "R2": r2_score(y_test, predictions)
+        }
+        
+        for metric, value in metrics.items():
+            print(f"  {metric}: {value:.4f}")
+
+        
+        try:
+            if best_target_name in ["Random_Forest", "XGBoost", "LightGBM"]:
+                explainer = shap.TreeExplainer(best_target_model)
+                shap_values = explainer.shap_values(X_test)
+                plt.figure(figsize=(10, 6))
+                shap.summary_plot(shap_values, X_test, show=False)
+                
+                plt.savefig(f"shap_importance_{target}.png", bbox_inches='tight')
+                plt.close()
+        except Exception as e:
+            print(f"  SHAP bypassed: {e}")
+
+        
+        champion_models[target] = best_target_model
+        all_metrics[target] = metrics
+
+    print("\n--- All Multi-Step Models Trained Successfully ---")
+    return champion_models, all_metrics
