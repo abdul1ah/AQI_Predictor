@@ -1,7 +1,8 @@
 import hopsworks
 import pandas as pd
 from src.config import (
-    HOPSWORKS_PROJECT_NAME, 
+    HOPSWORKS_PROJECT_NAME,
+    HOPSWORKS_API_KEY, 
     FEATURE_GROUP_NAME, 
     FEATURE_VIEW_NAME, 
     FEATURE_VIEW_VERSION
@@ -11,10 +12,12 @@ def get_training_dataset() -> pd.DataFrame:
     """Fetches the engineered feature matrix from Hopsworks."""
     print("Connecting to Hopsworks Feature Store...")
     
-    # Explicitly disabling hostname verification
+
     project = hopsworks.login(
+        host="eu-west.cloud.hopsworks.ai", 
         project=HOPSWORKS_PROJECT_NAME, 
-        hostname_verification=False
+        api_key_value=HOPSWORKS_API_KEY,
+        hostname_verification=False      
     )
     
     # THIS IS THE LINE THAT WAS MISSING

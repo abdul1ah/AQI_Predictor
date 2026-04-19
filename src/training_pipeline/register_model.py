@@ -1,7 +1,7 @@
 import os
 import joblib
 import hopsworks
-from src.config import HOPSWORKS_PROJECT_NAME
+from src.config import HOPSWORKS_PROJECT_NAME, HOPSWORKS_API_KEY
 from src.training_pipeline.fetch_training_data import get_training_dataset
 from src.training_pipeline.train_evaluate import train_model
 
@@ -16,7 +16,9 @@ def upload_model(model, metrics: dict):
     
     # Explicitly disabling hostname verification
     project = hopsworks.login(
+        host="eu-west.cloud.hopsworks.ai", 
         project=HOPSWORKS_PROJECT_NAME, 
+        api_key_value=HOPSWORKS_API_KEY,
         hostname_verification=False
     )
     
