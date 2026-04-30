@@ -23,8 +23,10 @@ def get_training_dataset() -> pd.DataFrame:
     
     try:
         feature_view = fs.get_feature_view(name=FEATURE_VIEW_NAME, version=FEATURE_VIEW_VERSION)
-        print(" -> Feature View already exists. Proceeding...")
     except Exception:
+        feature_view = None
+        
+    if feature_view is None:
         print(" -> Feature View not found. Creating it now...")
         feature_view = fs.create_feature_view(
             name=FEATURE_VIEW_NAME,
@@ -32,6 +34,8 @@ def get_training_dataset() -> pd.DataFrame:
             query=query
         )
         print(" -> Feature View created successfully!")
+    else:
+        print(" -> Feature View already exists. Proceeding...")
     
     print("4. Downloading dataset for training...")
     df = query.read()
