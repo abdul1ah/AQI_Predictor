@@ -60,7 +60,7 @@ def fetch_historical_data(city_name: str, years_back: int) -> pd.DataFrame:
 
     # --- PULL WEATHER DATA ---
     url_weather = (
-        f"https://archive-api.open-meteo.com/v1/archive?"
+        f"https://api.open-meteo.com/v1/forecast?"
         f"latitude={lat}&longitude={lon}"
         f"&start_date={start_date.strftime('%Y-%m-%d')}"
         f"&end_date={end_date.strftime('%Y-%m-%d')}"
