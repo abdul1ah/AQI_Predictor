@@ -23,36 +23,23 @@ def train_model(train_data: pd.DataFrame) -> Tuple[Dict[str, Any], Dict[str, Dic
     model_zoo = {
         "Ridge_Regression": {
             "model": Ridge(), 
-            "params": {"alpha": [0.01, 0.1, 1.0, 10.0, 100.0]}
+            "params": {"alpha": [0.1, 1.0, 10.0]}
         },
         "Random_Forest": {
             "model": RandomForestRegressor(random_state=42, n_jobs=-1),
-            "params": {"n_estimators": [100, 300], "max_depth": [None, 10, 20]}
+            "params": {"n_estimators": [50, 100], "max_depth": [None, 10]}
         },
         "Gradient_Boosting": {
             "model": GradientBoostingRegressor(random_state=42),
-            "params": {
-                "n_estimators": [100, 300], 
-                "learning_rate": [0.01, 0.05, 0.1], 
-                "max_depth": [3, 5, 8]
-            }
+            "params": {"n_estimators": [50, 100], "learning_rate": [0.05, 0.1], "max_depth": [3, 5]}
         },
         "XGBoost": {
             "model": xgb.XGBRegressor(objective='reg:squarederror', random_state=42, n_jobs=-1),
-            "params": {
-                "n_estimators": [100, 300, 500], 
-                "learning_rate": [0.01, 0.05, 0.1], 
-                "max_depth": [3, 5, 8]
-            }
+            "params": {"n_estimators": [50, 100], "learning_rate": [0.05, 0.1], "max_depth": [3, 5]}
         },
         "LightGBM": {
             "model": lgb.LGBMRegressor(random_state=42, n_jobs=-1, verbose=-1),
-            "params": {
-                "n_estimators": [100, 300, 500], 
-                "learning_rate": [0.01, 0.05, 0.1], 
-                "num_leaves": [31, 50, 100],
-                "max_depth": [-1, 5, 10]
-            }
+            "params": {"n_estimators": [50, 100], "learning_rate": [0.05, 0.1], "num_leaves": [31, 50]}
         }
     }
 
