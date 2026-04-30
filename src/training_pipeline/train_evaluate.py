@@ -20,33 +20,44 @@ def train_model(train_data: pd.DataFrame) -> Tuple[Dict[str, Any], Dict[str, Dic
     
     base_X = train_data.drop(columns=['city', 'date'] + targets)
     
-
     model_zoo = {
         "Ridge_Regression": {
             "model": Ridge(), 
-            "params": {"alpha": [0.1, 1.0, 10.0]}
+            "params": {"alpha": [0.01, 0.1, 1.0, 10.0, 100.0]}
         },
         "Random_Forest": {
             "model": RandomForestRegressor(random_state=42, n_jobs=-1),
-            "params": {"n_estimators": [50, 100], "max_depth": [None, 10]}
+            "params": {"n_estimators": [100, 300], "max_depth": [None, 10, 20]}
         },
         "Gradient_Boosting": {
             "model": GradientBoostingRegressor(random_state=42),
-            "params": {"n_estimators": [50, 100], "learning_rate": [0.05, 0.1], "max_depth": [3, 5]}
+            "params": {
+                "n_estimators": [100, 300], 
+                "learning_rate": [0.01, 0.05, 0.1], 
+                "max_depth": [3, 5, 8]
+            }
         },
         "XGBoost": {
             "model": xgb.XGBRegressor(objective='reg:squarederror', random_state=42, n_jobs=-1),
-            "params": {"n_estimators": [50, 100], "learning_rate": [0.05, 0.1], "max_depth": [3, 5]}
+            "params": {
+                "n_estimators": [100, 300, 500], 
+                "learning_rate": [0.01, 0.05, 0.1], 
+                "max_depth": [3, 5, 8]
+            }
         },
         "LightGBM": {
             "model": lgb.LGBMRegressor(random_state=42, n_jobs=-1, verbose=-1),
-            "params": {"n_estimators": [50, 100], "learning_rate": [0.05, 0.1], "num_leaves": [31, 50]}
+            "params": {
+                "n_estimators": [100, 300, 500], 
+                "learning_rate": [0.01, 0.05, 0.1], 
+                "num_leaves": [31, 50, 100],
+                "max_depth": [-1, 5, 10]
+            }
         }
     }
 
     champion_models = {}
     all_metrics = {}
-
     
     for target in targets:
         print(f"\n{'='*50}")
@@ -54,7 +65,6 @@ def train_model(train_data: pd.DataFrame) -> Tuple[Dict[str, Any], Dict[str, Dic
         print(f"{'='*50}")
         
         y = train_data[target]
-        
         
         X_train, X_test, y_train, y_test = train_test_split(base_X, y, test_size=0.2, shuffle=False)
         tscv = TimeSeriesSplit(n_splits=3)
@@ -78,10 +88,10 @@ def train_model(train_data: pd.DataFrame) -> Tuple[Dict[str, Any], Dict[str, Dic
 
         print(f"\n[WINNER FOR {target}]: {best_target_name}")
 
-        # Evaluate the specific champion
         predictions = best_target_model.predict(X_test)
+
         metrics = {
-            "RMSE": mean_squared_error(y_test, predictions, squared=False),
+            "RMSE": mean_squared_error(y_test, predictions) ** 0.5,
             "MAE": mean_absolute_error(y_test, predictions),
             "R2": r2_score(y_test, predictions)
         }
@@ -89,20 +99,28 @@ def train_model(train_data: pd.DataFrame) -> Tuple[Dict[str, Any], Dict[str, Dic
         for metric, value in metrics.items():
             print(f"  {metric}: {value:.4f}")
 
-        
         try:
             if best_target_name in ["Random_Forest", "XGBoost", "LightGBM"]:
                 explainer = shap.TreeExplainer(best_target_model)
                 shap_values = explainer.shap_values(X_test)
+                
                 plt.figure(figsize=(10, 6))
                 shap.summary_plot(shap_values, X_test, show=False)
-                
                 plt.savefig(f"shap_importance_{target}.png", bbox_inches='tight')
                 plt.close()
+                
+            elif best_target_name == "Ridge_Regression":
+                explainer = shap.LinearExplainer(best_target_model, X_train)
+                shap_values = explainer.shap_values(X_test)
+                
+                plt.figure(figsize=(10, 6))
+                shap.summary_plot(shap_values, X_test, show=False)
+                plt.savefig(f"shap_importance_{target}.png", bbox_inches='tight')
+                plt.close()
+                
         except Exception as e:
             print(f"  SHAP bypassed: {e}")
-
-        
+            
         champion_models[target] = best_target_model
         all_metrics[target] = metrics
 

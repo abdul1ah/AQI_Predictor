@@ -19,3 +19,4 @@ Thumbs.db
 
 *.csv
 data/
+test_inference.py
