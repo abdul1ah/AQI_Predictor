@@ -63,7 +63,6 @@ def train_model(train_data: pd.DataFrame) -> Tuple[Dict[str, Any], Dict[str, Dic
         best_target_model = None
         best_target_name = ""
 
-        
         for model_name, config in model_zoo.items():
             print(f"-> Cross-validating {model_name}...")
             grid_search = GridSearchCV(

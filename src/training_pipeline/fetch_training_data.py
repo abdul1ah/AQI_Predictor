@@ -3,7 +3,7 @@ import pandas as pd
 from src.config import *
 
 def get_training_dataset() -> pd.DataFrame:
-    print("Connecting to Hopsworks Feature Store...")
+    print("1. Connecting to Hopsworks Feature Store...")
     project = hopsworks.login(
         host="eu-west.cloud.hopsworks.ai", 
         project=HOPSWORKS_PROJECT_NAME, 
@@ -12,13 +12,29 @@ def get_training_dataset() -> pd.DataFrame:
     )
     fs = project.get_feature_store()
     
+    print(f"2. Fetching Feature Group: {FEATURE_GROUP_NAME} V{FEATURE_GROUP_VERSION}...")
     fg = fs.get_feature_group(
         name=FEATURE_GROUP_NAME, 
         version=FEATURE_GROUP_VERSION
     )
     
-    print(f"Downloading raw dataset from {FEATURE_GROUP_NAME} V{FEATURE_GROUP_VERSION}...")
-    df = fg.read()
+    print(f"3. Validating/Creating Feature View: {FEATURE_VIEW_NAME} V{FEATURE_VIEW_VERSION}...")
+    query = fg.select_all()
+    
+    try:
+        feature_view = fs.get_feature_view(name=FEATURE_VIEW_NAME, version=FEATURE_VIEW_VERSION)
+        print(" -> Feature View already exists. Proceeding...")
+    except Exception:
+        print(" -> Feature View not found. Creating it now...")
+        feature_view = fs.create_feature_view(
+            name=FEATURE_VIEW_NAME,
+            version=FEATURE_VIEW_VERSION,
+            query=query
+        )
+        print(" -> Feature View created successfully!")
+    
+    print("4. Downloading dataset for training...")
+    df = query.read()
     
     df = df.sort_values(by=['city', 'date']).reset_index(drop=True)
     
