@@ -19,6 +19,9 @@ def train_model(train_data: pd.DataFrame) -> Tuple[Dict[str, Any], Dict[str, Dic
     targets = ['target_pm2_5_1d', 'target_pm2_5_2d', 'target_pm2_5_3d']
     
     base_X = train_data.drop(columns=['city', 'date'] + targets)
+    print("\n=== COLUMNS GIVEN TO THE MODEL ===")
+    print(base_X.columns.tolist())
+    print("=======================================================\n")
     
     model_zoo = {
         "Ridge_Regression": {
