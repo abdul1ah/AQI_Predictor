@@ -83,9 +83,11 @@ async def lifespan(app: FastAPI):
         model_name = f"aqi_{target}_model"
         
         # Ask Hopsworks what the absolute newest version is
-        all_models = mr.get_models(model_name)
-        latest_version = max([m.version for m in all_models])
+        # all_models = mr.get_models(model_name)
+        # latest_version = max([m.version for m in all_models])
         
+        latest_version = 18  # <-- hardcoded for testing
+
         # Create a specific folder name that includes the version! (e.g., "aqi_target_pm2_5_1d_model_v18")
         versioned_dir = f"{model_name}_v{latest_version}"
         
