@@ -21,3 +21,7 @@ Thumbs.db
 data/
 test_inference.py
 *.python
+*_model_v*
+# Node/React
+frontend/node_modules/
+frontend/dist/
