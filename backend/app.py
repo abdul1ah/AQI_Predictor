@@ -40,6 +40,15 @@ def pm25_to_aqi(pm25_value: float) -> int:
             return int(round(aqi))
     return 500
 
+def format_date_with_ordinal(date_obj):
+    """Formats a datetime object to '2nd May 2026' format."""
+    day = date_obj.day
+    if 11 <= (day % 100) <= 13:
+        suffix = 'th'
+    else:
+        suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(day % 10, 'th')
+    return f"{day}{suffix} {date_obj.strftime('%b %Y')}"
+
 def fetch_live_current_aqi(city_name: str):
     """Hits Open-Meteo API to get the exact 'Right Now' AQI for the dashboard."""
     try:
@@ -145,7 +154,7 @@ def refresh_all_cache_and_models():
             prediction_pm25 = max(0, float(model.predict(latest_data_point)[0]))
 
             forecast_results.append({
-                "date": forecast_date.strftime('%Y-%m-%d'),
+                "date": format_date_with_ordinal(forecast_date),
                 "day_name": forecast_date.strftime('%A'),
                 "predicted_aqi": pm25_to_aqi(prediction_pm25),
                 "raw_pm25": round(prediction_pm25, 1)
