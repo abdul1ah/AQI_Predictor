@@ -7,7 +7,7 @@ This repository contains an end-to-end, serverless machine learning pipeline des
 The goal of this project is to build an automated, low-maintenance system that processes environmental data and serves reliable forecasts. 
 
 **Core Components:**
-* **Data Ingestion:** Automatically fetching live weather and pollution data from external APIs.
-* **Feature & Model Pipelines:** Processing historical data to train and evaluate predictive models.
-* **Automation:** Utilizing CI/CD workflows to continuously update features and retrain models without manual intervention.
+* **Automated Daily Data Ingestion Pipeline:** Automatically fetching live weather and pollution data from external APIs daily.
+* **Feature & Model Pipelines:** Processing historical data to train and evaluate predictive models daily.
+* **Automation:** Utilizing CI/CD workflows to continuously update features at every hour and retrain models every day without manual intervention.
 * **Dashboard:** An interactive web interface to visualize real-time conditions, forecasts, and model insights.
