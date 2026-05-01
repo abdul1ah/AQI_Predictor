@@ -12,10 +12,11 @@ from datetime import datetime, timedelta
 from src.config import HOPSWORKS_PROJECT_NAME, HOPSWORKS_API_KEY, FEATURE_VIEW_NAME, FEATURE_VIEW_VERSION
 
 # --- GLOBAL STATE (RAM) ---
-# We store the models and feature view here so they persist between API requests
+# We store the models, feature view, and the data matrix here so they persist between API requests
 app_state = {
     "models": {},
-    "feature_view": None
+    "feature_view": None,
+    "batch_data": None  # <-- Added for RAM caching
 }
 
 # --- HELPER FUNCTIONS ---
@@ -76,6 +77,11 @@ async def lifespan(app: FastAPI):
     print("2. Caching Feature View...")
     app_state["feature_view"] = fs.get_feature_view(name=FEATURE_VIEW_NAME, version=FEATURE_VIEW_VERSION)
 
+    print("2.5 Pre-fetching ML Data into RAM...")
+    # <-- Download the matrix ONCE when the server boots
+    app_state["batch_data"] = app_state["feature_view"].get_batch_data()
+    print(f" -> Successfully cached {len(app_state['batch_data'])} rows in memory.")
+
     print("3. Downloading and Loading Latest Models into RAM...")
     targets = ["target_pm2_5_1d", "target_pm2_5_2d", "target_pm2_5_3d"]
     
@@ -105,6 +111,7 @@ async def lifespan(app: FastAPI):
     yield
     print("Shutting down server, clearing RAM...")
     app_state["models"].clear()
+    app_state["batch_data"] = None
 
 app = FastAPI(title="AQI Predictor API", lifespan=lifespan)
 
@@ -117,7 +124,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 @app.get("/")
 def health_check():
@@ -135,9 +141,8 @@ def get_city_forecast(city: str = "karachi"):
     if not live_data:
         raise HTTPException(status_code=404, detail=f"Could not find live data for city: {city}")
 
-    # 2. Fetch ML Features from Hopsworks
     try:
-        batch_data = app_state["feature_view"].get_batch_data()
+        batch_data = app_state["batch_data"] 
         city_data = batch_data[batch_data['city'] == city].copy()
         
         if city_data.empty:
@@ -162,16 +167,17 @@ def get_city_forecast(city: str = "karachi"):
     for idx, target in enumerate(targets):
         days_ahead = idx + 1
         forecast_date = base_time + timedelta(days=days_ahead)
-        
-        # Pull the specific model directly from RAM
+
         model = app_state["models"][target]
         prediction_pm25 = model.predict(latest_data_point)[0]
+        
+        prediction_pm25 = max(0, float(prediction_pm25))
         
         forecast_results.append({
             "date": forecast_date.strftime('%Y-%m-%d'),
             "day_name": forecast_date.strftime('%A'),
             "predicted_aqi": pm25_to_aqi(prediction_pm25),
-            "raw_pm25": round(float(prediction_pm25), 1)
+            "raw_pm25": round(prediction_pm25, 1)
         })
 
     # 4. Construct Final Dashboard JSON Response
