@@ -34,7 +34,8 @@ def fetch_historical_data(city_name: str, years_back: int) -> pd.DataFrame:
     print(f"Fetching AQI & Weather data for {city_name.capitalize()}...")
     lat, lon = get_coordinates(city_name)
     
-    today_date = datetime.now()
+    # --- TIMEZONE FIX: Force Pakistan Standard Time (UTC+5) ---
+    today_date = datetime.utcnow() + timedelta(hours=5)
     
     # OVER-FETCH: We ask the API for tomorrow to force it to return the forecast for the rest of today
     fetch_end_date = today_date + timedelta(days=1) 
@@ -114,7 +115,7 @@ def fetch_historical_data(city_name: str, years_back: int) -> pd.DataFrame:
     # Forward-fill missing forecast data to bridge the gap between live analysis and future forecast
     df_master = df_master.ffill()
     
-    # Slice off the "Tomorrow" buffer we fetched, ensuring the dataframe perfectly ends at 23:00 "Today"
+    # Slice off the "Tomorrow" buffer we fetched, ensuring the dataframe perfectly ends at 23:00 "Today" (PKT)
     today_str = today_date.strftime('%Y-%m-%d')
     df_master = df_master[df_master['timestamp'].dt.date <= pd.to_datetime(today_str).date()]
 
