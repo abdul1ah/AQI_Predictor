@@ -1,0 +1,20 @@
+name: Keep Hugging Face Space Alive
+
+on:
+  schedule:
+
+    - cron: '0 */12 * * *'
+  
+  workflow_dispatch: 
+
+jobs:
+  ping-backend:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Ping the FastAPI Health Check Endpoint
+
+        run: |
+          echo "Pinging Hugging Face Space to keep it awake..."
+          curl -f https://abdullah-32-aqi-forecaster-backend.hf.space/ || echo "Ping failed, but workflow continues."
+          echo "Ping successful!"
