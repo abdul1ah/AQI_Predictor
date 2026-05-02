@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+joblib
+hopsworks==4.7.2
+pandas==2.2.0
+requests==2.31.0
+scikit-learn==1.4.0
+xgboost
+lightgbm
+python-dotenv==1.0.1
+pyarrow==15.0.0
