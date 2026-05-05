@@ -3,7 +3,7 @@ name: Feature Pipeline Execution
 on:
   workflow_dispatch: 
   schedule:
-    - cron: '0 * * * *'
+    - cron: '17 * * * *'
 jobs:
   run-pipeline:
     runs-on: ubuntu-22.04
