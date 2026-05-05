@@ -236,13 +236,14 @@ def health_check():
 
 async def delayed_refresh_task():
     """Waits for Hopsworks materialization to finish, then refreshes."""
-    print(f"[{datetime.now()}] Webhook acknowledged. Waiting 25 minutes for Hopsworks...")
-    await asyncio.sleep(1500)  # Sleep for exactly 25 minutes (1500 seconds)
+    # Force the log to print instantly
+    print(f"[{datetime.now()}] Webhook acknowledged. Waiting 25 minutes for Hopsworks...", flush=True)
+    await asyncio.sleep(1500)  
     
     try:
         await asyncio.to_thread(refresh_all_cache_and_models)
     except Exception as e:
-        print(f"Delayed Refresh Failed: {e}")
+        print(f"Delayed Refresh Failed: {e}", flush=True)
 
 @app.post("/api/refresh-cache")
 async def trigger_refresh(background_tasks: BackgroundTasks, x_webhook_secret: str = Header(None)):
