@@ -7,6 +7,9 @@ on:
 jobs:
   run-pipeline:
     runs-on: ubuntu-22.04
+
+    env:
+      TZ: Asia/Karachi
     
     steps:
       - name: Checkout Code
