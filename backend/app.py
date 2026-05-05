@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import hopsworks
@@ -168,15 +168,6 @@ def refresh_all_cache_and_models():
     app_state["cached_forecasts"] = new_cache
     print(f"[{datetime.now()}] --- Integrated Refresh Cycle Complete ---")
 
-async def background_loop():
-    """Background loop that executes the integrated refresh every hour."""
-    while True:
-        await asyncio.sleep(3600)  # Sleep for 1 hour
-        try:
-            # Execute blocking Hopsworks/Pandas logic in a separate thread
-            await asyncio.to_thread(refresh_all_cache_and_models)
-        except Exception as e:
-            print(f"Error in background integrated refresh: {e}")
 
 # --- SERVER LIFESPAN (Runs once on boot) ---
 @asynccontextmanager
@@ -218,15 +209,9 @@ async def lifespan(app: FastAPI):
     # We call this again to pre-fetch batch data and run initial forecasts.
     # We run in thread so boot remains asynchronous.
     await asyncio.to_thread(refresh_all_cache_and_models)
-
-    print("4. Starting integrated background refresh loop...")
-    app_state["bg_task"] = asyncio.create_task(background_loop())
-
     print("Server Boot Up Complete.")
     yield
     print("Shutting down server, clearing RAM...")
-    if app_state["bg_task"]:
-        app_state["bg_task"].cancel()
     app_state["models"].clear()
     app_state["current_versions"].clear()
     app_state["cached_forecasts"].clear()
@@ -248,6 +233,33 @@ app.add_middleware(
 @app.get("/")
 def health_check():
     return {"status": "online", "message": "AQI Predictor is running."}
+
+async def delayed_refresh_task():
+    """Waits for Hopsworks materialization to finish, then refreshes."""
+    print(f"[{datetime.now()}] Webhook acknowledged. Waiting 25 minutes for Hopsworks...")
+    await asyncio.sleep(1500)  # Sleep for exactly 25 minutes (1500 seconds)
+    
+    try:
+        await asyncio.to_thread(refresh_all_cache_and_models)
+    except Exception as e:
+        print(f"Delayed Refresh Failed: {e}")
+
+@app.post("/api/refresh-cache")
+async def trigger_refresh(background_tasks: BackgroundTasks, x_webhook_secret: str = Header(None)):
+    """Webhook triggered by GitHub Actions when new data is ready in Hopsworks."""
+    
+    expected_secret = os.getenv("WEBHOOK_SECRET")
+    if not expected_secret or x_webhook_secret != expected_secret:
+        raise HTTPException(status_code=401, detail="Unauthorized: Invalid Webhook Secret")
+
+    # Instead of running immediately, we hand the job to FastAPI's background manager
+    background_tasks.add_task(delayed_refresh_task)
+    
+    # We immediately reply to GitHub so it can shut down and save you minutes!
+    return {
+        "status": "success", 
+        "message": "Refresh scheduled! Backend will update in exactly 25 minutes."
+    }
 
 @app.get("/api/forecast")
 def get_city_forecast(city: str = "karachi"):

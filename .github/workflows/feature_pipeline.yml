@@ -31,3 +31,11 @@ jobs:
           HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
         run: |
           python -u -m src.feature_pipeline.backfill
+
+      - name: Trigger Hugging Face Webhook
+        env: 
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+        run: |
+          echo "Pinging Hugging Face backend to refresh cache..."
+          curl -X POST "https://abdullah-32-aqi-forecaster-backend.hf.space/api/refresh-cache" \
+          -H "x-webhook-secret: $WEBHOOK_SECRET"
