@@ -164,7 +164,7 @@ export default function App() {
                   <div>
                     <h2 className="text-lg lg:text-xl font-bold mb-3 flex items-center gap-2 text-gray-200">
                       <Wind className="w-5 h-5 lg:w-6 lg:h-6 text-cyan-400 shrink-0" />
-                      3-Day Machine Learning Forecast
+                      What the Next 3 Days Look Like
                     </h2>
                     
                     <div className="grid grid-cols-3 gap-3 mb-3">
