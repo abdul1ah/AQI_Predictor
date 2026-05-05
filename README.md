@@ -2,6 +2,9 @@
 
 This repository contains an end-to-end, serverless machine learning pipeline designed to predict the Air Quality Index (AQI) for the upcoming three days. 
 
+## Dashboard URL
+https://aqi-predictor-two.vercel.app/
+
 ## Project Overview
 
 The goal of this project is to build an automated, low-maintenance system that processes environmental data and serves reliable forecasts. 
