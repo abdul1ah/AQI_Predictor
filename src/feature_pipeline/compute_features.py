@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from datetime import datetime, timedelta
 
 def build_feature_pipeline(raw_df: pd.DataFrame) -> pd.DataFrame:
     """Transforms raw hourly data into daily aggregated features and targets."""
@@ -11,7 +12,7 @@ def build_feature_pipeline(raw_df: pd.DataFrame) -> pd.DataFrame:
     df['date'] = df['timestamp'].dt.date
  
     # 2. Daily Aggregation
-    daily_df = df.groupby(['city', 'date']).mean().reset_index()
+    daily_df = df.groupby(['city', 'date']).mean(numeric_only=True).reset_index()
     daily_df['date'] = pd.to_datetime(daily_df['date'])
     daily_df = daily_df.sort_values(by=['city', 'date']).reset_index(drop=True)
  
@@ -36,11 +37,20 @@ def build_feature_pipeline(raw_df: pd.DataFrame) -> pd.DataFrame:
     daily_df['target_pm2_5_2d'] = daily_df.groupby('city')['pm2_5'].shift(-2)
     daily_df['target_pm2_5_3d'] = daily_df.groupby('city')['pm2_5'].shift(-3)
  
+    # 7. Safety Cleanup (Fixing the Hopsworks crashes)
     input_cols = [col for col in daily_df.columns if not col.startswith('target_')]
-
     final_df = daily_df.dropna(subset=input_cols).reset_index(drop=True)
+    
+    # Fill target NaNs with a dummy float to prevent Hopsworks PySpark schema crashes
+    target_cols = [col for col in daily_df.columns if col.startswith('target_')]
+    final_df[target_cols] = final_df[target_cols].fillna(-1.0)
  
     final_df = final_df.drop(columns=['timestamp'], errors='ignore')
+    
+    # 8. THE INCREMENTAL SLICE (Push Narrow)
+    # We only want to push the last 2 days to Hopsworks to save RAM and prevent overwriting good history
+    cutoff_date = pd.to_datetime(datetime.now().date() - timedelta(days=2))
+    incremental_df = final_df[final_df['date'] >= cutoff_date].copy()
  
-    print(f"Feature engineering complete. Matrix shape: {final_df.shape}")
-    return final_df
+    print(f"Feature engineering complete. Matrix shape reduced from {final_df.shape} to {incremental_df.shape} for incremental upload.")
+    return incremental_df
