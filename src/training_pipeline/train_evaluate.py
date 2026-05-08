@@ -63,7 +63,13 @@ def train_model(train_data: pd.DataFrame) -> Tuple[Dict[str, Any], Dict[str, Dic
             }
         },
         "LightGBM": {
-            "model": lgb.LGBMRegressor(random_state=42, n_jobs=-1, verbose=-1),
+            "model": lgb.LGBMRegressor(
+                objective='quantile', 
+                alpha=0.85, 
+                random_state=42, 
+                n_jobs=-1, 
+                verbose=-1
+            ),
             "params": {
                 "n_estimators": [100, 200], 
                 "learning_rate": [0.05, 0.1], 
@@ -89,33 +95,13 @@ def train_model(train_data: pd.DataFrame) -> Tuple[Dict[str, Any], Dict[str, Dic
         best_target_model = None
         best_target_name = ""
 
-        sample_weights = np.ones(len(y_train))
-        sample_weights[y_train > 100] = 10.0
-        sample_weights[y_train > 200] = 25.0
-
         for model_name, config in model_zoo.items():
             print(f"-> Cross-validating {model_name}...")
-            
-            # Scikit-learn's GridSearchCV requires sample_weights to be passed via fit_params
-            fit_params = {}
-            if model_name in ["XGBoost", "LightGBM", "Ridge_Regression"]:
-                 # Most standard sklearn API models accept sample_weight in fit
-                 fit_params = {f"{model_name.lower().replace('_regression', '')}__sample_weight": sample_weights} 
-                 # Note: For pure GridSearchCV without pipelines, passing fit_params is simpler:
-                 fit_params = {'sample_weight': sample_weights}
-
             grid_search = GridSearchCV(
                 estimator=config["model"], param_grid=config["params"],
                 cv=tscv, scoring='r2', n_jobs=-1
             )
-            
-            # Pass the weights into the fit function!
-            try:
-                grid_search.fit(X_train, y_train, **fit_params)
-            except Exception as e:
-                # Fallback if a specific model strictly rejects sample weights
-                print(f"   [!] Sample weighting failed for {model_name}, training normally. Error: {e}")
-                grid_search.fit(X_train, y_train)
+            grid_search.fit(X_train, y_train)
             
             if grid_search.best_score_ > best_target_score:
                 best_target_score = grid_search.best_score_
