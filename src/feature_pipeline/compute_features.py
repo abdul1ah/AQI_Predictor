@@ -3,14 +3,38 @@ import numpy as np
 from datetime import datetime, timedelta
 
 def build_feature_pipeline(raw_df: pd.DataFrame) -> pd.DataFrame:
-    """Transforms raw hourly data into daily aggregated statistical features and targets."""
+    """Transforms raw hourly data into daily aggregated statistical features and targets, while filtering hardware glitches."""
     print("Initiating smart feature engineering pipeline...")
  
     # 1. Ensure datetime format and sort
     df = raw_df.copy()
     df['timestamp'] = pd.to_datetime(df['timestamp'])
+    
+    # Sort chronologically by city and time so our interpolation and diffs work correctly
+    df = df.sort_values(by=['city', 'timestamp']).reset_index(drop=True)
     df['date'] = df['timestamp'].dt.date
  
+    # 1.5. Detect and Repair Isolated Sensor Glitches (Hourly Level)
+    print("  -> Scanning for isolated sensor hardware glitches...")
+    
+    # a glitch being a massive, physically impossible 1-hour spike
+    # Example: Spiking UP by more than 300, and immediately crashing DOWN by more than 300 in the next hour
+    for col in ['pm2_5', 'pm10']:
+        if col in df.columns:
+            # diff(1) is Current - Previous. diff(-1) is Current - Next.
+            diff_prev = df.groupby('city')[col].diff(1)
+            diff_next = df.groupby('city')[col].diff(-1)
+            
+            # Identify rows that are massive isolated peaks
+            is_glitch = (diff_prev > 300) & (diff_next > 300)
+            glitch_count = is_glitch.sum()
+            
+            if glitch_count > 0:
+                print(f"     [!] WARNING: Found and neutralized {glitch_count} hardware glitches in {col}.")
+                # Replace the fake massive spike with NaN, then linearly interpolate the gap
+                df.loc[is_glitch, col] = np.nan
+                df[col] = df.groupby('city')[col].transform(lambda x: x.interpolate(method='linear', limit_direction='both'))
+
     # 2. Daily Aggregation (The Smart Way)
     print("  -> Aggregating hourly data into daily statistical features...")
     

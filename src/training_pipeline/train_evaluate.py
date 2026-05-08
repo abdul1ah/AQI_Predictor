@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 from typing import Tuple, Dict, Any
 from sklearn.model_selection import train_test_split, TimeSeriesSplit, GridSearchCV
@@ -8,6 +9,31 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import xgboost as xgb
 import lightgbm as lgb
 import shap
+
+def evaluate_segmented(y_true: pd.Series, y_pred: np.ndarray, target_name: str) -> None:
+    """Breaks down model accuracy based on the severity of the real-world pollution."""
+    # Convert y_true to a numpy array to prevent pandas index misalignment with y_pred
+    y_true_vals = y_true.values if isinstance(y_true, pd.Series) else y_true
+    results = pd.DataFrame({'Actual': y_true_vals, 'Predicted': y_pred})
+    
+    # Define our real-world severity buckets
+    bins = [-np.inf, 100, 200, np.inf]
+    labels = ['Normal (<100)', 'Moderate (100-200)', 'Extreme (>200)']
+    results['Severity'] = pd.cut(results['Actual'], bins=bins, labels=labels)
+    
+    print(f"\n--- SEGMENTED MAE FOR: {target_name.upper()} ---")
+    
+    for category in labels:
+        subset = results[results['Severity'] == category]
+        
+        if len(subset) > 0:
+            mae = mean_absolute_error(subset['Actual'], subset['Predicted'])
+            pct = (len(subset) / len(results)) * 100
+            print(f"[{category}]".ljust(20) + f" Count: {len(subset):<4} ({pct:>4.1f}%) | MAE: {mae:.2f}")
+        else:
+            print(f"[{category}]".ljust(20) + f" Count: 0    ( 0.0%) | MAE: N/A")
+            
+    print("-" * 50)
 
 def train_model(train_data: pd.DataFrame) -> Tuple[Dict[str, Any], Dict[str, Dict[str, float]]]:
     """
@@ -80,6 +106,7 @@ def train_model(train_data: pd.DataFrame) -> Tuple[Dict[str, Any], Dict[str, Dic
 
         predictions = best_target_model.predict(X_test)
 
+        # Standard Metrics
         metrics = {
             "RMSE": mean_squared_error(y_test, predictions) ** 0.5,
             "MAE": mean_absolute_error(y_test, predictions),
@@ -88,6 +115,9 @@ def train_model(train_data: pd.DataFrame) -> Tuple[Dict[str, Any], Dict[str, Dic
         
         for metric, value in metrics.items():
             print(f"  {metric}: {value:.4f}")
+
+        # === INJECTED: THE TRUTH TELLER (SEGMENTED EVALUATION) ===
+        evaluate_segmented(y_test, predictions, target)
 
         try:
             if best_target_name in ["Random_Forest", "XGBoost", "LightGBM"]:
