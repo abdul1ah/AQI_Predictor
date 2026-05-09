@@ -128,7 +128,7 @@ def train_model(train_data: pd.DataFrame) -> Tuple[Dict[str, Any], Dict[str, Dic
         try:
             if best_target_name in ["Random_Forest", "XGBoost", "LightGBM"]:
                 best_target_model.set_params(base_score=0.5)
-                Explainer(best_target_model)
+                explainer = shap.TreeExplainer(best_target_model)
                 shap_values = explainer.shap_values(X_test)
                 
                 plt.figure(figsize=(10, 6))
