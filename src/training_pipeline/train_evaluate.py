@@ -53,28 +53,35 @@ def train_model(train_data: pd.DataFrame) -> Tuple[Dict[str, Any], Dict[str, Dic
     model_zoo = {
         "Statistical_Ridge": {
             "model": Ridge(random_state=42), 
-            "params": {"alpha": [0.1, 1.0, 10.0]}
+            "params": {
+                "alpha": [0.1, 1.0, 10.0, 50.0]
+            }
         },
         "Ensemble_RandomForest": {
             "model": RandomForestRegressor(random_state=42, n_jobs=-1),
             "params": {
-                "n_estimators": [100, 200],
-                "max_depth": [5, 10, None]
+                "n_estimators": [200, 400],
+                "max_depth": [10, 20, None],
+                "min_samples_leaf": [2, 5]
             }
         },
         "DeepLearning_MLP": {
-            "model": MLPRegressor(random_state=42, max_iter=500, early_stopping=True),
+            "model": MLPRegressor(random_state=42, early_stopping=True, max_iter=2000),
             "params": {
-                "hidden_layer_sizes": [(64, 32), (128, 64, 32)],
-                "learning_rate_init": [0.001, 0.01]
+                "hidden_layer_sizes": [(128, 64, 32), (256, 128, 64)],
+                "learning_rate_init": [0.001, 0.005],
+                "alpha": [0.001, 0.01, 0.1]
             }
         },
         "GradientBoosting_XGBoost": {
             "model": xgb.XGBRegressor(objective='reg:squarederror', random_state=42, n_jobs=-1),
             "params": {
-                "n_estimators": [100, 300], 
-                "learning_rate": [0.05, 0.1], 
-                "max_depth": [3, 5]
+                "n_estimators": [200, 500], 
+                "learning_rate": [0.01, 0.05], 
+                "max_depth": [4, 6, 8],
+                "subsample": [0.8],         
+                "colsample_bytree": [0.8],  
+                "reg_lambda": [1.0, 5.0]      
             }
         }
     }
@@ -146,10 +153,20 @@ def train_model(train_data: pd.DataFrame) -> Tuple[Dict[str, Any], Dict[str, Dic
                 plt.close()
                 
             elif best_target_name == "DeepLearning_MLP":
-                print("  SHAP bypassed for Deep Learning model to save pipeline compute time.")
+                print("  -> Generating SHAP for Deep Learning (Optimized with K-Means)...")
+                background = shap.kmeans(X_train, 50)
+                explainer = shap.KernelExplainer(best_target_model.predict, background)
+                
+                X_test_sampled = shap.sample(X_test, 100)
+                shap_values = explainer.shap_values(X_test_sampled)
+                
+                plt.figure(figsize=(10, 6))
+                shap.summary_plot(shap_values, X_test_sampled, show=False)
+                plt.savefig(f"shap_importance_{target}.png", bbox_inches='tight')
+                plt.close()
                 
         except Exception as e:
-            print(f"  SHAP bypassed: {e}")
+            print(f"  SHAP failed: {e}")
             
         champion_models[target] = best_target_model
         all_metrics[target] = metrics
