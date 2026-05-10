@@ -3,64 +3,36 @@ import numpy as np
 from datetime import datetime, timedelta
 
 def build_feature_pipeline(raw_df: pd.DataFrame) -> pd.DataFrame:
-    """Transforms raw hourly data into daily aggregated statistical features and targets, while filtering hardware glitches."""
-    print("Initiating smart feature engineering pipeline...")
+    """Transforms raw hourly data into daily aggregated features and targets."""
+    print("Initiating feature engineering pipeline...")
  
     # 1. Ensure datetime format and sort
     df = raw_df.copy()
     df['timestamp'] = pd.to_datetime(df['timestamp'])
-    
-    # Sort chronologically by city and time so our interpolation and diffs work correctly
-    df = df.sort_values(by=['city', 'timestamp']).reset_index(drop=True)
     df['date'] = df['timestamp'].dt.date
- 
-    # 1.5. Detect and Repair Isolated Sensor Glitches (Hourly Level)
-    print("  -> Scanning for isolated sensor hardware glitches...")
     
-    # a glitch being a massive, physically impossible 1-hour spike
-    # Example: Spiking UP by more than 300, and immediately crashing DOWN by more than 300 in the next hour
-    for col in ['pm2_5', 'pm10']:
-        if col in df.columns:
-            # diff(1) is Current - Previous. diff(-1) is Current - Next.
-            diff_prev = df.groupby('city')[col].diff(1)
-            diff_next = df.groupby('city')[col].diff(-1)
-            
-            # Identify rows that are massive isolated peaks
-            is_glitch = (diff_prev > 300) & (diff_next > 300)
-            glitch_count = is_glitch.sum()
-            
-            if glitch_count > 0:
-                print(f"     [!] WARNING: Found and neutralized {glitch_count} hardware glitches in {col}.")
-                # Replace the fake massive spike with NaN, then linearly interpolate the gap
-                df.loc[is_glitch, col] = np.nan
-                df[col] = df.groupby('city')[col].transform(lambda x: x.interpolate(method='linear', limit_direction='both'))
+    df = df.sort_values(by=['city', 'timestamp']).reset_index(drop=True)
 
-    # 2. Daily Aggregation (The Smart Way)
-    print("  -> Aggregating hourly data into daily statistical features...")
-    
-    aggregation_rules = {
-        'pm2_5': ['mean', 'max', 'std'],         # Average, worst spike, and volatility
-        'pm10': ['mean', 'max'],
-        'no2': ['mean'],
-        'ozone': ['mean', 'max'],
-        'temperature_2m': ['mean', 'max', 'min'], # Daily high and low temps
-        'precipitation': ['sum'],                 # Total rain for the day
-        'wind_speed_10m': ['mean', 'max']         # Average wind, and maximum gusts
-    }
-    
-    daily_df = df.groupby(['city', 'date']).agg(aggregation_rules).reset_index()
+    # 1.5 Check for any abnormal spikes in pollutant data 
+    print("  -> Checking for abnormal spikes in pollutant data...")
+    pollutant_cols = ['pm2_5', 'pm10', 'no2', 'ozone']
+    for col in pollutant_cols:
+        if col in df.columns:
+            # Find impossible hourly jumps (> 300)
+            diff = df.groupby('city')[col].diff().abs()
+            glitch_mask = diff > 300
+            
+            # Neutralize and Interpolate
+            df.loc[glitch_mask, col] = np.nan
+            df[col] = df.groupby('city')[col].transform(
+                lambda x: x.interpolate(method='linear', limit_direction='both')
+            )
  
-    # Flatten the multi-level columns created by .agg()
-    daily_df.columns = [f"{col[0]}_{col[1]}" if col[1] else col[0] for col in daily_df.columns]
- 
-    # Rename our base PM2.5 mean back to just 'pm2_5' to keep downstream logic intact
-    daily_df = daily_df.rename(columns={'pm2_5_mean': 'pm2_5'})
- 
+    # 2. Daily Aggregation (Using safe means to protect hourly updates)
+    print("  -> Aggregating hourly data into daily means...")
+    daily_df = df.groupby(['city', 'date']).mean(numeric_only=True).reset_index()
     daily_df['date'] = pd.to_datetime(daily_df['date'])
     daily_df = daily_df.sort_values(by=['city', 'date']).reset_index(drop=True)
-    
-    # Safety catch: Standard Deviation (std) returns NaN if a day only had 1 hour of data. 
-    daily_df = daily_df.fillna(0)
  
     # 3. Temporal Features
     print("  -> Extracting time-based features...")
@@ -94,7 +66,7 @@ def build_feature_pipeline(raw_df: pd.DataFrame) -> pd.DataFrame:
     final_df = final_df.drop(columns=['timestamp'], errors='ignore')
     
     # 8. THE INCREMENTAL SLICE (Push Narrow)
-    # We only want to push the last 2 days to Hopsworks to save RAM and prevent overwriting good history
+    print("  -> Slicing data for incremental push...")
     cutoff_date = pd.to_datetime(datetime.now().date() - timedelta(days=2))
     incremental_df = final_df[final_df['date'] >= cutoff_date].copy()
  

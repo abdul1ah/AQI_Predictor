@@ -55,7 +55,12 @@ def train_model(train_data: pd.DataFrame) -> Tuple[Dict[str, Any], Dict[str, Dic
             "params": {"alpha": [0.01, 0.1, 1.0, 10.0, 100.0]}
         },
         "XGBoost": {
-            "model": xgb.XGBRegressor(objective='reg:squarederror', random_state=42, n_jobs=-1),
+            "model": xgb.XGBRegressor(
+                objective='reg:quantileerror', 
+                quantile_alpha=0.85, 
+                random_state=42, 
+                n_jobs=-1
+            ),
             "params": {
                 "n_estimators": [100, 300], 
                 "learning_rate": [0.01, 0.05, 0.1], 
@@ -99,7 +104,7 @@ def train_model(train_data: pd.DataFrame) -> Tuple[Dict[str, Any], Dict[str, Dic
             print(f"-> Cross-validating {model_name}...")
             grid_search = GridSearchCV(
                 estimator=config["model"], param_grid=config["params"],
-                cv=tscv, scoring='r2', n_jobs=-1
+                cv=tscv, scoring='neg_mean_absolute_error', n_jobs=-1
             )
             grid_search.fit(X_train, y_train)
             
@@ -127,7 +132,9 @@ def train_model(train_data: pd.DataFrame) -> Tuple[Dict[str, Any], Dict[str, Dic
 
         try:
             if best_target_name in ["Random_Forest", "XGBoost", "LightGBM"]:
-                best_target_model.set_params(base_score=0.5)
+                if best_target_name == "XGBoost":
+                    best_target_model.set_params(base_score=0.5)
+                    
                 explainer = shap.TreeExplainer(best_target_model)
                 shap_values = explainer.shap_values(X_test)
                 
