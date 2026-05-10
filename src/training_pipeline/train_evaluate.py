@@ -10,6 +10,9 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import xgboost as xgb
 import lightgbm as lgb
 import shap
+import logging
+
+logging.getLogger("shap").setLevel(logging.WARNING)
 
 def evaluate_segmented(y_true: pd.Series, y_pred: np.ndarray, target_name: str) -> None:
     """Breaks down model accuracy based on the severity of the real-world pollution."""
