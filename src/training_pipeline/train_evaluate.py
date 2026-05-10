@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from typing import Tuple, Dict, Any
 from sklearn.model_selection import train_test_split, TimeSeriesSplit, GridSearchCV
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.neural_network import MLPRegressor
 from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import xgboost as xgb
@@ -50,35 +51,30 @@ def train_model(train_data: pd.DataFrame) -> Tuple[Dict[str, Any], Dict[str, Dic
     print("=======================================================\n")
     
     model_zoo = {
-        "Ridge_Regression": {
-            "model": Ridge(), 
-            "params": {"alpha": [0.01, 0.1, 1.0, 10.0, 100.0]}
+        "Statistical_Ridge": {
+            "model": Ridge(random_state=42), 
+            "params": {"alpha": [0.1, 1.0, 10.0]}
         },
-        "XGBoost": {
-            "model": xgb.XGBRegressor(
-                objective='reg:quantileerror', 
-                quantile_alpha=0.85, 
-                random_state=42, 
-                n_jobs=-1
-            ),
+        "Ensemble_RandomForest": {
+            "model": RandomForestRegressor(random_state=42, n_jobs=-1),
             "params": {
-                "n_estimators": [100, 300], 
-                "learning_rate": [0.01, 0.05, 0.1], 
-                "max_depth": [3, 5]
+                "n_estimators": [100, 200],
+                "max_depth": [5, 10, None]
             }
         },
-        "LightGBM": {
-            "model": lgb.LGBMRegressor(
-                objective='quantile', 
-                alpha=0.85, 
-                random_state=42, 
-                n_jobs=-1, 
-                verbose=-1
-            ),
+        "DeepLearning_MLP": {
+            "model": MLPRegressor(random_state=42, max_iter=500, early_stopping=True),
             "params": {
-                "n_estimators": [100, 200], 
+                "hidden_layer_sizes": [(64, 32), (128, 64, 32)],
+                "learning_rate_init": [0.001, 0.01]
+            }
+        },
+        "GradientBoosting_XGBoost": {
+            "model": xgb.XGBRegressor(objective='reg:squarederror', random_state=42, n_jobs=-1),
+            "params": {
+                "n_estimators": [100, 300], 
                 "learning_rate": [0.05, 0.1], 
-                "num_leaves": [31, 63],
+                "max_depth": [3, 5]
             }
         }
     }
@@ -104,7 +100,7 @@ def train_model(train_data: pd.DataFrame) -> Tuple[Dict[str, Any], Dict[str, Dic
             print(f"-> Cross-validating {model_name}...")
             grid_search = GridSearchCV(
                 estimator=config["model"], param_grid=config["params"],
-                cv=tscv, scoring='neg_mean_absolute_error', n_jobs=-1
+                cv=tscv, scoring='r2', n_jobs=-1
             )
             grid_search.fit(X_train, y_train)
             
@@ -127,14 +123,11 @@ def train_model(train_data: pd.DataFrame) -> Tuple[Dict[str, Any], Dict[str, Dic
         for metric, value in metrics.items():
             print(f"  {metric}: {value:.4f}")
 
-        # === INJECTED: THE TRUTH TELLER (SEGMENTED EVALUATION) ===
         evaluate_segmented(y_test, predictions, target)
 
         try:
-            if best_target_name in ["Random_Forest", "XGBoost", "LightGBM"]:
-                if best_target_name == "XGBoost":
-                    best_target_model.set_params(base_score=0.5)
-                    
+            # Tree-based models get TreeExplainer
+            if best_target_name in ["Ensemble_RandomForest", "GradientBoosting_XGBoost"]:
                 explainer = shap.TreeExplainer(best_target_model)
                 shap_values = explainer.shap_values(X_test)
                 
@@ -143,7 +136,7 @@ def train_model(train_data: pd.DataFrame) -> Tuple[Dict[str, Any], Dict[str, Dic
                 plt.savefig(f"shap_importance_{target}.png", bbox_inches='tight')
                 plt.close()
                 
-            elif best_target_name == "Ridge_Regression":
+            elif best_target_name == "Statistical_Ridge":
                 explainer = shap.LinearExplainer(best_target_model, X_train)
                 shap_values = explainer.shap_values(X_test)
                 
@@ -151,6 +144,9 @@ def train_model(train_data: pd.DataFrame) -> Tuple[Dict[str, Any], Dict[str, Dic
                 shap.summary_plot(shap_values, X_test, show=False)
                 plt.savefig(f"shap_importance_{target}.png", bbox_inches='tight')
                 plt.close()
+                
+            elif best_target_name == "DeepLearning_MLP":
+                print("  SHAP bypassed for Deep Learning model to save pipeline compute time.")
                 
         except Exception as e:
             print(f"  SHAP bypassed: {e}")
